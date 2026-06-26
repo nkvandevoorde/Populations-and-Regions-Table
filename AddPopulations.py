@@ -1,6 +1,8 @@
 import openpyxl
 from openpyxl import load_workbook
 import unicodedata
+import pandas as pd
+import re
 
 #Read datasheets
 sample_wb = load_workbook("/Users/noravandevoorde/Downloads/SPHERE/Add_Population_copy.xlsx")
@@ -19,6 +21,14 @@ def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
     return ''.join([c for c in nfkd_form if not unicodedata.combining(c)])
 
+#split city and state in census data
+df = pd.read_excel("/Users/noravandevoorde/Downloads/SPHERE/tabela4714.xlsx")
+df[["City", "State"]] = df["Município"].str.extract(r"^(.*?)\s*\((.*?)\)$")
+df["City"] = df["City"].str.strip()
+df["State"] = df["State"].str.strip()
+
+
+
 #clean names
 def clean(value):
     if value is None:
@@ -29,7 +39,8 @@ def clean(value):
 sample_cities = {}
 for excel_row, row in enumerate(sample_ws.iter_rows(min_row=2, values_only=True)):
     sample_cities[excel_row] = {
-        "City": clean(row[2]) if row[2] is not None else ""
+        "City": clean(row[2]) if row[2] is not None else "",
+        "State": clean(row[1]) if row [1] is not None else ""
     }
 
 print(list(sample_cities.items())[:5])
@@ -37,9 +48,24 @@ print(list(sample_cities.items())[:5])
 #Get cities and population from census data
 cities_and_pop = {}
 for census_row, row in enumerate(census_ws.iter_rows(min_row=3, values_only=True)):
+    location = clean(row[2]) if row[2] is not None else ""
+    
+    # split "City (ST)" format
+    match = re.match(r"^(.*?)\s*\((.*?)\)$", location)
+
+    if match:
+        city = clean(match.group(1))
+        state = clean(match.group(2))
+    else:
+        city = location
+        state = ""
+
     cities_and_pop[census_row] = {
-        "City": clean(row[2]) if row[2] is not None else "",
+        "City": city,
+        "State": state,
         "Population": clean(row[3]) if row[3] is not None else ""
     }
 
 print(list(cities_and_pop.items())[:5])
+
+#Match enteries based on city and state and paste population into sample datasheet
